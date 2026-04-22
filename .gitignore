@@ -1,0 +1,7 @@
+# Touch On Time exports should stay local and must not be published.
+*.csv
+*.xlsx
+*.xls
+
+# Keep the bundled sample fixture for local testing.
+!data/sample.csv
