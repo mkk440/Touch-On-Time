@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>勤怠エラー文章作成ツール</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#f0f4f8;color:#1a202c;min-height:100vh}
+  header{background:#2b6cb0;color:#fff;padding:18px 28px;display:flex;align-items:center;gap:12px}
+  header h1{font-size:1.25rem;font-weight:700}
+  header .tag{font-size:.8rem;background:#3182ce;padding:3px 10px;border-radius:20px}
+  .container{max-width:1000px;margin:28px auto;padding:0 16px;display:flex;flex-direction:column;gap:20px}
+  .card{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:24px}
+  .card h2{font-size:1rem;font-weight:700;color:#2d3748;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #ebf4ff}
+  label{display:block;font-size:.85rem;font-weight:600;color:#4a5568;margin-bottom:4px;margin-top:12px}
+  label:first-child{margin-top:0}
+  input[type=date],input[type=text],select{width:100%;padding:8px 12px;border:1px solid #cbd5e0;border-radius:6px;font-size:.9rem;outline:none;transition:border-color .2s}
+  input[type=date]:focus,input[type=text]:focus,select:focus{border-color:#3182ce}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .upload-area{border:2px dashed #a0aec0;border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;background:#f7fafc}
+  .upload-area:hover,.upload-area.drag{border-color:#3182ce;background:#ebf8ff}
+  .upload-area input{display:none}
+  .upload-icon{font-size:2.2rem;margin-bottom:8px}
+  .upload-area p{color:#718096;font-size:.88rem}
+  .file-name{color:#2b6cb0;font-weight:600;margin-top:6px;font-size:.88rem}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border:none;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer;transition:all .2s}
+  .btn-primary{background:#2b6cb0;color:#fff}
+  .btn-primary:hover{background:#2c5282}
+  .btn-secondary{background:#e2e8f0;color:#2d3748}
+  .btn-secondary:hover{background:#cbd5e0}
+  .btn-success{background:#38a169;color:#fff}
+  .btn-success:hover{background:#276749}
+  .btn-group{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .output-box{background:#1a202c;color:#e2e8f0;border-radius:8px;padding:20px;font-family:monospace;font-size:.9rem;white-space:pre-wrap;line-height:1.7;min-height:120px;max-height:500px;overflow-y:auto}
+  .error-table{width:100%;border-collapse:collapse;font-size:.82rem}
+  .error-table th{background:#2b6cb0;color:#fff;padding:7px 10px;text-align:left}
+  .error-table td{padding:6px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+  .error-table tr:hover td{background:#ebf8ff}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
+  .badge-red{background:#fed7d7;color:#c53030}
+  .badge-orange{background:#feebc8;color:#c05621}
+  .badge-blue{background:#bee3f8;color:#2b6cb0}
+  .badge-purple{background:#e9d8fd;color:#553c9a}
+  .badge-gray{background:#e2e8f0;color:#4a5568}
+  .status-bar{background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:10px 16px;font-size:.85rem;color:#2b6cb0;display:none}
+  .status-bar.error-s{background:#fff5f5;border-color:#fed7d7;color:#c53030}
+  .status-bar.success-s{background:#f0fff4;border-color:#c6f6d5;color:#276749}
+  .debug-box{background:#fffbeb;border:1px solid #f6e05e;border-radius:8px;padding:12px 16px;font-size:.76rem;color:#744210;white-space:pre-wrap;line-height:1.6;margin-top:10px;max-height:240px;overflow-y:auto;display:none}
+  .tab-bar{display:flex;gap:2px;margin-bottom:16px}
+  .tab-btn{padding:7px 18px;border:none;border-radius:6px 6px 0 0;font-size:.85rem;font-weight:600;cursor:pointer;background:#e2e8f0;color:#4a5568}
+  .tab-btn.active{background:#2b6cb0;color:#fff}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+  .count-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{background:#ebf4ff;color:#2b6cb0;border-radius:20px;padding:3px 12px;font-size:.8rem;font-weight:600}
+  .hint{font-size:.76rem;color:#718096;margin-top:3px}
+  @media(max-width:600px){.row2{grid-template-columns:1fr}.btn-group{flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:1.4rem">📋</span>
+  <h1>勤怠エラー文章作成ツール</h1>
+  <span class="tag">Touch On Time 対応</span>
+</header>
+
+<div class="container">
+
+  <!-- STEP 1 -->
+  <div class="card">
+    <h2>STEP 1 ： CSVファイルをアップロード</h2>
+    <div class="upload-area" id="dropZone">
+      <input type="file" id="csvFile" accept=".csv">
+      <div class="upload-icon">📁</div>
+      <p>Touch On Time の日別勤怠CSVをドラッグ＆ドロップ<br>または クリックして選択</p>
+      <div class="file-name" id="fileName">ファイル未選択</div>
+    </div>
+    <div id="debugBox" class="debug-box"></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card">
+    <h2>STEP 2 ： 期間・設定</h2>
+    <div class="row2">
+      <div>
+        <label for="dateFrom">対象期間 開始日</label>
+        <input type="date" id="dateFrom" value="2026-04-01">
+      </div>
+      <div>
+        <label for="dateTo">対象期間 終了日</label>
+        <input type="date" id="dateTo" value="2026-04-16">
+      </div>
+    </div>
+    <label for="monthLabel">文章タイトルの月表記</label>
+    <input type="text" id="monthLabel" value="4月" placeholder="例：4月">
+    <p class="hint">冒頭の「○月未申請・エラー該当者各位」に使用されます</p>
+    <label for="deadlineLabel">申請期限の文言</label>
+    <input type="text" id="deadlineLabel" value="本日中" placeholder="例：4/25">
+    <p class="hint">本文の「○○までに」に使用されます</p>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card">
+    <h2>STEP 3 ： 文章を生成する</h2>
+    <div id="statusBar" class="status-bar"></div>
+    <div class="btn-group">
+      <button class="btn btn-primary" onclick="generate()">▶ 文章を生成する</button>
+      <button class="btn btn-secondary" onclick="loadSample()">🧪 サンプルで動作確認</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card" id="resultCard" style="display:none">
+    <h2>STEP 4 ： 生成結果</h2>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('text')">📝 送信文章</button>
+      <button class="tab-btn" onclick="switchTab('table')">📊 エラー一覧</button>
+    </div>
+    <div class="count-chips" id="countChips"></div>
+    <div class="tab-panel active" id="tabText">
+      <div class="output-box" id="outputText"></div>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="copyText()">📋 全文コピー</button>
+      </div>
+    </div>
+    <div class="tab-panel" id="tabTable">
+      <div style="overflow-x:auto">
+        <table class="error-table">
+          <thead><tr><th>所属</th><th>氏名</th><th>日付</th><th>エラー内容</th></tr></thead>
+          <tbody id="errorTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// 部署順・マッピング
+// ============================================================
+const DEPT_ORDER = ['中央','大阪北','コンサル','総務','本部'];
+const DEPT_MAP = {
+  '中央営業部':'中央','中央':'中央',
+  '大阪北店':'大阪北','大阪北':'大阪北',
+  'コンサルティング事業部':'コンサル','コンサル':'コンサル',
+  '総務部':'総務','総務':'総務',
+  '本部':'本部'
+};
+
+// ============================================================
+// Touch On Time 日別CSV 固定列インデックス
+// ============================================================
+const COL = {
+  DEPT:         3,
+  NAME:         7,
+  DATE_FULL:   29,
+  DATE_SHORT:  30,
+  PATTERN:     33,
+  DAY_TYPE:    34,
+  LEAVE_TYPE:  35,
+  SCHED_NOTE:  36,
+  SCHED_IN:    37,
+  SCHED_OUT:   38,
+  CLOCK_IN:    45,
+  CLOCK_OUT:   46,
+  CLOCK_IN_M:  51,
+  CLOCK_OUT_M: 52
+};
+
+let parsedRows = [];
+
+const dropZone  = document.getElementById('dropZone');
+const csvFileEl = document.getElementById('csvFile');
+
+dropZone.addEventListener('click', () => csvFileEl.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  handleFile(e.dataTransfer.files[0]);
+});
+csvFileEl.addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('fileName').textContent = file.name;
+  tryRead(file, ['shift_jis', 'utf-8', 'euc-jp'], 0);
+}
+
+function tryRead(file, encs, idx) {
+  if (idx >= encs.length) { showStatus('読み込み失敗。Shift-JIS/UTF-8/EUC-JPのCSVをご確認ください。', 'error-s'); return; }
+  const r = new FileReader();
+  r.onload = ev => {
+    const text = ev.target.result;
+    const bad = (text.match(/\uFFFD/g)||[]).length / Math.max(1, text.length);
+    if (bad > 0.05 && idx < encs.length - 1) { tryRead(file, encs, idx + 1); return; }
+    parseCSV(text, encs[idx]);
+  };
+  r.readAsText(file, encs[idx]);
+}
+
+function parseCSV(text, enc) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length < 2) { showStatus('データ行がありません。', 'error-s'); return; }
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = splitCSV(lines[i]);
+    if (cells.length < 35) continue;
+    rows.push(cells);
+  }
+  parsedRows = rows;
+
+  showDebug(buildDebug(rows));
+  showStatus(`✅ ${rows.length} 行を読み込みました（${enc}）`, 'success-s');
+}
+
+function splitCSV(line) {
+  const res = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+    else if (c === ',' && !inQ) { res.push(cur.trim()); cur=''; }
+    else cur += c;
+  }
+  res.push(cur.trim());
+  return res;
+}
+
+function buildDebug(rows) {
+  const lines = [`読み込み行数: ${rows.length}`];
+
+  const sampleDayType = rows.find(r => r[COL.DAY_TYPE])?.[ COL.DAY_TYPE] || '';
+  const isMojibake = sampleDayType.includes('\uFFFD');
+  lines.push(`文字コード判定: ${isMojibake ? '⚠️ 文字化けあり（フォールバックモードで動作）' : '✅ 正常（Shift-JIS/UTF-8で正しく読めています）'}`);
+  lines.push(`COL[34] 勤務日種別サンプル: "${sampleDayType}"`);
+
+  const s = rows.find(r => r[COL.DATE_SHORT] && /^\d{4}\/\d/.test(r[COL.DATE_SHORT]) && r[COL.SCHED_IN]);
+  const s2 = rows.find(r =>
+    r[COL.DATE_SHORT] &&
+    /^\d{4}\/\d/.test(r[COL.DATE_SHORT]) &&
+    (((r[COL.DAY_TYPE] || '').includes('休日')) || ((r[COL.LEAVE_TYPE] || '').includes('全日'))) &&
+    !r[COL.CLOCK_IN] && !r[COL.CLOCK_OUT] && !r[COL.CLOCK_IN_M] && !r[COL.CLOCK_OUT_M]
+  );
+  lines.push('--- 通常勤務サンプル ---');
+  if (s) {
+    lines.push(`  COL[29] 日付(完全): "${s[COL.DATE_FULL]}"`);
+    lines.push(`  COL[30] 日付(短):   "${s[COL.DATE_SHORT]}"`);
+    lines.push(`  COL[33] パターン:   "${s[COL.PATTERN]}"`);
+    lines.push(`  COL[34] 勤務日種別: "${s[COL.DAY_TYPE]}" ← 平日 / 法定休日 など`);
+    lines.push(`  COL[35] 休暇区分:   "${s[COL.LEAVE_TYPE]}" ← AM有休 / PM有休 / 全日休`);
+    lines.push(`  COL[37] 所定開始:   "${s[COL.SCHED_IN]}"`);
+    lines.push(`  COL[38] 所定終了:   "${s[COL.SCHED_OUT]}"`);
+    lines.push(`  COL[45] 出勤実績:   "${s[COL.CLOCK_IN]}"`);
+    lines.push(`  COL[46] 退勤実績:   "${s[COL.CLOCK_OUT]}"`);
+    lines.push(`  COL[51] 出勤打刻:   "${s[COL.CLOCK_IN_M]}"`);
+    lines.push(`  COL[52] 退勤打刻:   "${s[COL.CLOCK_OUT_M]}"`);
+  }
+  lines.push('--- 全休サンプル ---');
+  if (s2) {
+    lines.push(`  COL[29] 日付(完全): "${s2[COL.DATE_FULL]}"`);
+    lines.push(`  COL[34] 勤務日種別: "${s2[COL.DAY_TYPE]}" ← 「法定休日」などが入る`);
+    lines.push(`  COL[35] 休暇区分:   "${s2[COL.LEAVE_TYPE]}" ← 「公休 全日 / 有休 全日」など`);
+    lines.push(`  COL[37] 所定開始:   "${s2[COL.SCHED_IN]}" ← 全休日は空になりやすい`);
+    lines.push(`  COL[45] 出勤実績:   "${s2[COL.CLOCK_IN]}"`);
+  }
+  return lines.join('\n');
+}
+
+function toDateNum(y, m, d) { return y*10000 + m*100 + d; }
+
+function parseDateFromStr(s) {
+  if (!s) return null;
+  const m = s.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+  if (!m) return null;
+  return { y:+m[1], m:+m[2], d:+m[3], num:toDateNum(+m[1],+m[2],+m[3]) };
+}
+
+function inputToNum(s) {
+  if (!s) return null;
+  const p = s.split('-');
+  return p.length===3 ? toDateNum(+p[0],+p[1],+p[2]) : null;
+}
+
+function fmtDate(s) {
+  const d = parseDateFromStr(s);
+  return d ? `${d.m}/${d.d}` : s;
+}
+
+function addDaysToDateNum(dateInfo, days) {
+  const d = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
+  d.setDate(d.getDate() + days);
+  return toDateNum(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+const HAS_TIME = /\d{1,2}:\d{2}/;
+
+function countTimes(s) {
+  return s ? (s.match(/\d{1,2}:\d{2}/g)||[]).length : 0;
+}
+
+function stampDateNum(s) {
+  if (!s) return null;
+  const d = parseDateFromStr(s);
+  return d ? d.num : null;
+}
+
+function detectErrors(rows, fromNum, toNum) {
+  const errors = [];
+
+  for (const cells of rows) {
+    const dateShort  = cells[COL.DATE_SHORT]  || '';
+    const dept       = cells[COL.DEPT]        || '';
+    const name       = cells[COL.NAME]        || '';
+    const pattern    = cells[COL.PATTERN]     || '';
+    const dayType    = cells[COL.DAY_TYPE]    || '';
+    const leaveType  = cells[COL.LEAVE_TYPE]  || '';
+    const schedIn    = cells[COL.SCHED_IN]    || '';
+    const schedOut   = cells[COL.SCHED_OUT]   || '';
+    const clockIn    = cells[COL.CLOCK_IN]    || '';
+    const clockOut   = cells[COL.CLOCK_OUT]   || '';
+    const clockInM   = cells[COL.CLOCK_IN_M]  || '';
+    const clockOutM  = cells[COL.CLOCK_OUT_M] || '';
+
+    if (!dateShort || !name) continue;
+
+    const dt = parseDateFromStr(dateShort);
+    if (!dt) continue;
+    if (fromNum !== null && dt.num < fromNum) continue;
+    if (toNum   !== null && dt.num > toNum)   continue;
+
+    const hasIn   = HAS_TIME.test(clockIn)  || HAS_TIME.test(clockInM);
+    const hasOut  = HAS_TIME.test(clockOut) || HAS_TIME.test(clockOutM);
+    const inCnt   = Math.max(countTimes(clockInM),  countTimes(clockIn));
+    const outCnt  = Math.max(countTimes(clockOutM), countTimes(clockOut));
+
+    const clockOutDateNum = stampDateNum(clockOut) || stampDateNum(clockOutM);
+    const nextDayNum      = addDaysToDateNum(dt, 1);
+    const isNextDayOut    = clockOutDateNum !== null && clockOutDateNum === nextDayNum;
+
+    const hasJapanese = /[\u3000-\u9FFF\uF900-\uFAFF]/.test(dayType + pattern + leaveType);
+    const hasMojibake = (dayType + pattern + leaveType).includes('\uFFFD');
+
+    let isFullDayOff, isDirect, isDirectGo, isDirectBoth, isAmLeave, isPmLeave, isNormalDay;
+
+    if (hasJapanese && !hasMojibake) {
+      isFullDayOff = dayType.includes('休日') || leaveType.includes('全日');
+      isDirectBoth = pattern.includes('直行直帰');
+      isDirect     = pattern.includes('直帰') && !isDirectBoth;
+      isDirectGo   = pattern.includes('直行') && !isDirectBoth;
+      isAmLeave    = leaveType.includes('AM有休');
+      isPmLeave    = leaveType.includes('PM有休');
+      isNormalDay  = !isFullDayOff && !isDirect && !isDirectGo && !isDirectBoth;
+    } else {
+      const hasSchedIn  = HAS_TIME.test(schedIn);
+      const hasSchedOut = HAS_TIME.test(schedOut);
+      isFullDayOff = !hasSchedIn && !hasSchedOut;
+      isDirectBoth = false;
+      isDirect     = hasSchedIn  && !hasSchedOut;
+      isDirectGo   = !hasSchedIn && hasSchedOut;
+      isAmLeave    = false;
+      isPmLeave    = false;
+      isNormalDay  = hasSchedIn  && hasSchedOut;
+    }
+
+    let msg = null;
+
+    if (isDirectBoth) {
+      if (isNextDayOut) {
+        msg = '退勤打刻が翌日になっています';
+      }
+    } else if (isFullDayOff) {
+      if (hasIn || hasOut) {
+        msg = '全日休暇なのに打刻あり';
+      }
+    } else if (isDirect) {
+      if (isNextDayOut) {
+        msg = '退勤打刻が翌日になっています';
+      } else if (hasOut) {
+        msg = '直帰申請してるのに退勤打刻あり';
+      } else if (!hasIn) {
+        msg = '出勤なし';
+      }
+    } else if (isDirectGo) {
+      if (hasIn) {
+        msg = '直行申請してるのに出勤打刻あり';
+      } else if (isNextDayOut) {
+        msg = '退勤打刻が翌日になっています';
+      } else if (!hasOut) {
+        msg = '退勤なし';
+      }
+    } else if (isNormalDay) {
+      if (inCnt >= 2) {
+        msg = '出勤重複';
+      } else if (outCnt >= 2) {
+        msg = '退勤重複';
+      } else if (isNextDayOut) {
+        msg = '退勤打刻が翌日になっています';
+      } else if (isAmLeave) {
+        if (!hasIn && !hasOut) msg = 'AM有休なのに勤怠なし';
+        else if (!hasIn)  msg = 'AM有休なのに出勤なし';
+        else if (!hasOut) msg = 'AM有休なのに退勤なし';
+      } else if (isPmLeave) {
+        if (!hasIn && !hasOut) msg = 'PM有休なのに勤怠なし';
+        else if (!hasIn)  msg = 'PM有休なのに出勤なし';
+        else if (!hasOut) msg = 'PM有休なのに退勤なし';
+      } else if (!hasIn && !hasOut) {
+        msg = '勤怠なし';
+      } else if (!hasIn) {
+        msg = '出勤なし';
+      } else if (!hasOut) {
+        msg = '退勤なし';
+      }
+    }
+
+    if (msg) {
+      errors.push({
+        dept: normDept(dept),
+        name: normName(name),
+        date: fmtDate(dateShort),
+        msg
+      });
+    }
+  }
+  return errors;
+}
+
+function normDept(s) {
+  for (const [k,v] of Object.entries(DEPT_MAP)) {
+    if (s.includes(k)) return v;
+  }
+  const code = s.match(/^(\d+)/);
+  if (code) {
+    const c = parseInt(code[1]);
+    if (c === 1001) return '中央';
+    if (c === 2000) return '大阪北';
+    if (c === 3000) return 'コンサル';
+    if (c === 5000) return '総務';
+    if (c === 6000) return '本部';
+  }
+  const clean = s.replace(/^\d+\s*/, '').trim();
+  return clean || s;
+}
+
+function normName(s) {
+  return s.replace(/^\d{5}\s*/, '').trim();
+}
+
+function buildMessage(errors, monthLabel, deadlineLabel) {
+  if (errors.length === 0) return `${monthLabel}未申請・エラー対象者は見つかりませんでした。`;
+
+  const map = {};
+  for (const e of errors) {
+    const key = `${e.dept}__${e.name}`;
+    if (!map[key]) map[key] = { dept: e.dept, name: e.name, items: [] };
+    map[key].items.push(`${e.date}\u3000${e.msg}`);
+  }
+
+  const byDept = {};
+  for (const v of Object.values(map)) {
+    if (!byDept[v.dept]) byDept[v.dept] = [];
+    byDept[v.dept].push(v);
+  }
+
+  const depts = Object.keys(byDept).sort((a,b) =>
+    (DEPT_ORDER.indexOf(a)===-1?99:DEPT_ORDER.indexOf(a)) -
+    (DEPT_ORDER.indexOf(b)===-1?99:DEPT_ORDER.indexOf(b))
+  );
+
+  let out = `${monthLabel}未申請・エラー該当者各位\n下記該当者は必ず${deadlineLabel}までに申請対応お願いします。\n`;
+  for (const dept of depts) {
+    out += `\n【${dept}】\n`;
+    for (const p of byDept[dept]) {
+      out += `@${p.name}\n`;
+      for (const item of p.items) out += `${item}\n`;
+      out += '\n';
+    }
+  }
+  return out.trim();
+}
+
+function generate() {
+  if (!parsedRows.length) { showStatus('先にCSVをアップロードしてください。', 'error-s'); return; }
+
+  const fromNum = inputToNum(document.getElementById('dateFrom').value);
+  const toNum   = inputToNum(document.getElementById('dateTo').value);
+  const label   = document.getElementById('monthLabel').value || '当月';
+  const deadlineLabel = document.getElementById('deadlineLabel').value.trim() || '本日中';
+
+  const errors = detectErrors(parsedRows, fromNum, toNum);
+  const msg    = buildMessage(errors, label, deadlineLabel);
+
+  document.getElementById('resultCard').style.display = '';
+  document.getElementById('outputText').textContent = msg;
+
+  const tbody = document.getElementById('errorTbody');
+  tbody.innerHTML = '';
+  for (const e of errors) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.dept}</td><td>${e.name}</td><td>${e.date}</td><td>${badge(e.msg)}</td>`;
+    tbody.appendChild(tr);
+  }
+
+  const people = new Set(errors.map(e=>`${e.dept}|${e.name}`)).size;
+  document.getElementById('countChips').innerHTML =
+    `<span class="chip">エラー計 ${errors.length} 件</span><span class="chip">対象者 ${people} 名</span>`;
+
+  showStatus(`✅ 生成完了。${errors.length}件（${people}名）検出。`, 'success-s');
+}
+
+function badge(msg) {
+  if (msg.includes('重複'))    return `<span class="badge badge-orange">${msg}</span>`;
+  if (msg.includes('直帰')||msg.includes('直行')) return `<span class="badge badge-purple">${msg}</span>`;
+  if (msg.includes('有休'))    return `<span class="badge badge-blue">${msg}</span>`;
+  if (msg.includes('翌日'))    return `<span class="badge badge-gray">${msg}</span>`;
+  if (msg.includes('全日休暇')) return `<span class="badge badge-orange">${msg}</span>`;
+  return `<span class="badge badge-red">${msg}</span>`;
+}
+
+function loadSample() {
+  function row(dept, name, dateShort, schedIn, schedOut, clockIn, clockOut, clockInM, clockOutM, pattern = '', dayType = '平日', leaveType = '') {
+    const r = new Array(160).fill('');
+    r[3]  = dept;
+    r[7]  = name;
+    r[29] = dateShort + '(テ)';
+    r[30] = dateShort;
+    r[33] = pattern;
+    r[34] = dayType;
+    r[35] = leaveType;
+    r[37] = schedIn;
+    r[38] = schedOut;
+    r[45] = clockIn;
+    r[46] = clockOut;
+    r[51] = clockInM;
+    r[52] = clockOutM;
+    return r;
+  }
+
+  function si(d){ return d+'(テ)09:00'; }
+  function so(d){ return d+'(テ)18:00'; }
+
+  const rows = [
+    row('1001 中央営業部','19002 谷口 偉久','2026/04/05', si('2026/04/05'), so('2026/04/05'), '', '2026/04/05(テ)18:20', '', 'C18:20'),
+    row('1001 中央営業部','19002 谷口 偉久','2026/04/06', si('2026/04/06'), so('2026/04/06'), '', '', '', ''),
+    row('1001 中央営業部','19002 谷口 偉久','2026/04/12', si('2026/04/12'), so('2026/04/12'), '2026/04/12(テ)08:53', '', 'C08:53', ''),
+    row('1001 中央営業部','25030 中尾 太亮','2026/04/12', si('2026/04/12'), so('2026/04/12'), '', '2026/04/12(テ)19:06', '', 'C19:06'),
+    row('1001 中央営業部','25030 中尾 太亮','2026/04/13', si('2026/04/13'), so('2026/04/13'), '2026/04/13(テ)08:56', '', 'C08:56', ''),
+    row('2000 大阪北店','24021 太田 智也','2026/04/10', si('2026/04/10'), so('2026/04/10'), '', '2026/04/10(テ)19:40', '認09:00', 'C19:40'),
+    row('2000 大阪北店','25031 干場 仁士','2026/04/13', si('2026/04/13'), so('2026/04/13'), '', '2026/04/13(テ)19:00', '', '位置19:00'),
+    row('3000 コンサルティング事業部','25027 西村 慎之介','2026/04/06', si('2026/04/06'), so('2026/04/06'), '2026/04/06(テ)08:54', '', '位置08:54', ''),
+    row('3000 コンサルティング事業部','25028 劉 瑾鈺','2026/04/13', si('2026/04/13'), so('2026/04/13'), '2026/04/13(テ)08:22', '', '位置08:22', ''),
+    row('5000 総務部','25137 橋詰 優佳','2026/04/01', si('2026/04/01'), so('2026/04/01'), '2026/04/01(テ)08:48', '2026/04/01(テ)18:51', 'C08:48', '位置18:51 C18:53 C18:53'),
+    row('6000 本部','23017 林口 拓矢','2026/04/13', si('2026/04/13'), so('2026/04/13'), '2026/04/13(テ)08:58', '', 'C08:58', ''),
+    row('6000 本部','23017 林口 拓矢','2026/04/20', si('2026/04/20'), so('2026/04/20'), '2026/04/20(テ)08:58', '', 'C08:58', ''),
+    row('2000 大阪北店','25036 葛井 裕太','2026/04/01', '', '', '2026/04/01(テ)09:00', '2026/04/02(テ)19:00', '認09:00', 'C2026/04/02(テ)19:00', '', '法定休日', '公休 全日'),
+    row('1001 中央営業部','99999 テスト 翌日','2026/04/03', si('2026/04/03'), so('2026/04/03'), '2026/04/03(テ)09:00', '2026/04/04(テ)19:00', 'C09:00', 'C2026/04/04(テ)19:00'),
+    row('1001 中央営業部','19002 谷口 偉久','2026/04/07', '', '', '', '', '', '', '', '法定休日', '公休 全日')
+  ];
+
+  parsedRows = rows;
+  document.getElementById('fileName').textContent = '📄 サンプルデータ（15行）';
+  document.getElementById('dateFrom').value = '2026-04-01';
+  document.getElementById('dateTo').value   = '2026-04-16';
+
+  const dbg = [
+    '読み込み行数: ' + rows.length,
+    '--- サンプル確認 ---',
+    `葛井 4/1: dayType="${rows[12][COL.DAY_TYPE]}", leave="${rows[12][COL.LEAVE_TYPE]}", clockIn="${rows[12][COL.CLOCK_IN]}"`,
+    `翌日退勤: clockOut="${rows[13][COL.CLOCK_OUT]}" ← 翌日日付あり`,
+    `谷口 4/7(全休打刻なし): dayType="${rows[14][COL.DAY_TYPE]}", clockIn="${rows[14][COL.CLOCK_IN]}" → エラーなし`,
+    '期間: 4/1〜4/16 で生成（4/20は除外される）'
+  ].join('\n');
+  showDebug(dbg);
+  showStatus('🧪 サンプル読み込み完了。「文章を生成する」を押してください。', 'success-s');
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('statusBar');
+  el.style.display = 'block';
+  el.className = 'status-bar ' + (type||'');
+  el.textContent = msg;
+}
+
+function showDebug(msg) {
+  const el = document.getElementById('debugBox');
+  el.style.display = 'block';
+  el.textContent = msg;
+}
+
+function copyText() {
+  navigator.clipboard.writeText(document.getElementById('outputText').textContent).then(() => {
+    const btn = event.currentTarget;
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✅ コピーしました！';
+    setTimeout(() => btn.innerHTML = orig, 2000);
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', (tab==='text'&&i===0)||(tab==='table'&&i===1)));
+  document.getElementById('tabText').classList.toggle('active',  tab==='text');
+  document.getElementById('tabTable').classList.toggle('active', tab==='table');
+}
+</script>
+</body>
+</html>
